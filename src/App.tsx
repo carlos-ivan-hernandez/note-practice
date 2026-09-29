@@ -1,5 +1,5 @@
 import {Button, Card, ToggleButton, ToggleButtonGroup} from '@heroui/react';
-import {Moon, Music, Play, Square, Sun} from 'lucide-react';
+import {Moon, Play, Square, Sun} from 'lucide-react';
 import {Suspense, lazy, useEffect, useState} from 'react';
 import type {Staves} from './game/notes';
 import type {Theme} from './game/PracticeScene';
@@ -34,32 +34,26 @@ export function App() {
   return (
     <div className='flex min-h-dvh flex-col text-foreground'>
       <header className='flex items-center justify-between border-b border-separator px-4 py-3 sm:px-6 sm:py-4'>
-        <div className='flex items-center gap-2'>
-          <Music className='size-5 text-accent' />
-          <h1 className='text-lg font-semibold'>Note Practice</h1>
-        </div>
-        <div className='flex items-center gap-2'>
-          {playing && (
-            <Button
-              variant='outline'
-              onPress={() => {
-                save('note', null);
-                setPlaying(false);
-              }}
-            >
-              <Square className='size-4' />
-              End
-            </Button>
-          )}
+        <Button
+          isIconOnly
+          variant='ghost'
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          onPress={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        >
+          {theme === 'dark' ? <Sun className='size-4' /> : <Moon className='size-4' />}
+        </Button>
+        {playing && (
           <Button
-            isIconOnly
-            variant='ghost'
-            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            onPress={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            variant='outline'
+            onPress={() => {
+              save('note', null);
+              setPlaying(false);
+            }}
           >
-            {theme === 'dark' ? <Sun className='size-4' /> : <Moon className='size-4' />}
+            <Square className='size-4' />
+            End
           </Button>
-        </div>
+        )}
       </header>
 
       <main className='flex flex-1 items-center justify-center p-4 sm:p-8'>

@@ -16,22 +16,23 @@ import {
 
 export type Theme = 'light' | 'dark';
 
-// Dark mode inverts the page: white ink on black paper.
+// Dark mode inverts the page: white ink on a dark background. `paper` matches the app's --background in styles.css,
+// so the game blends into the page.
 const palettes = {
   light: {
-    paper: 0xf7f5ef,
+    paper: 0xf5f5f5,
     ink: 0x1f2328,
     button: 0xffffff,
-    buttonHover: 0xece9df,
-    buttonBorder: 0xd3cfc3,
+    buttonHover: 0xebebeb,
+    buttonBorder: 0xd4d4d4,
     correct: 0x2f9e5b,
     wrong: 0xd64545,
   },
   dark: {
-    paper: 0x000000,
+    paper: 0x121212,
     ink: 0xf5f5f5,
-    button: 0x161616,
-    buttonHover: 0x262626,
+    button: 0x1c1c1c,
+    buttonHover: 0x2a2a2a,
     buttonBorder: 0x3a3a3a,
     correct: 0x3fbf6f,
     wrong: 0xe25c5c,

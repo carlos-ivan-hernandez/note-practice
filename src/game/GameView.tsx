@@ -64,7 +64,6 @@ export function GameView({theme, staves}: {theme: Theme; staves: Staves}) {
   return (
     <div
       ref={parent}
-      className='overflow-hidden rounded-xl border border-border'
       style={{
         aspectRatio: `${layout.width} / ${layout.height}`,
         width: `min(100%, calc((100dvh - 120px) * ${layout.width / layout.height}))`,
