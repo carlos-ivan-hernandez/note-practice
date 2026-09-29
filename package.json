@@ -1,0 +1,33 @@
+{
+  "name": "note-practice",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b && vite build",
+    "dev": "vite",
+    "lint": "oxlint",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "oxfmt": "^0.70.0",
+    "oxlint": "^1.85.0",
+    "oxlint-tsgolint": "^7.0.2003"
+  },
+  "dependencies": {
+    "@fontsource/noto-music": "^5.3.0",
+    "@heroui/react": "^3.2.6",
+    "@heroui/styles": "^3.2.6",
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react-swc": "^4.3.3",
+    "lucide-react": "^1.48.0",
+    "phaser": "^4.2.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.1"
+  }
+}
