@@ -1,8 +1,10 @@
-import {Button, Card, ToggleButton, ToggleButtonGroup} from '@heroui/react';
+import {Button, Card, Spinner, ToggleButton, ToggleButtonGroup} from '@heroui/react';
 import {Moon, Play, Square, Sun} from 'lucide-react';
-import {Suspense, lazy, useEffect, useState} from 'react';
+import {useEffect, useState} from 'react';
+import type {GameView as GameViewComponent} from './game/GameView';
 import type {Staves} from './game/notes';
 import type {Theme} from './game/PracticeScene';
+import {loadGameView, loadMusicFont} from './game/preload';
 import {load, save} from './session';
 
 const stavesOptions: {id: Staves; label: string}[] = [
@@ -11,7 +13,7 @@ const stavesOptions: {id: Staves; label: string}[] = [
   {id: 'bass', label: 'Bass'},
 ];
 
-const GameView = lazy(() => import('./game/GameView').then(m => ({default: m.GameView})));
+const themeColors: Record<Theme, string> = {dark: '#121212', light: '#f5f5f5'};
 
 export function App() {
   const [playing, setPlaying] = useState(() => load('playing', false));
@@ -24,16 +26,25 @@ export function App() {
   useEffect(() => save('staves', staves), [staves]);
   useEffect(() => save('theme', theme), [theme]);
 
+  // Fetch the game (Phaser is most of the app's weight) and its font while the start screen is up, so Start is instant.
+  // Holding the loaded component in state, rather than React.lazy, avoids React's ~300ms Suspense reveal throttle.
+  const [GameView, setGameView] = useState<typeof GameViewComponent>();
+  useEffect(() => {
+    void loadGameView().then(m => setGameView(() => m.GameView));
+    void loadMusicFont();
+  }, []);
+
   useEffect(() => {
     const root = document.documentElement;
     root.classList.remove('light', 'dark');
     root.classList.add(theme);
     root.dataset.theme = theme;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', themeColors[theme]);
   }, [theme]);
 
   return (
     <div className='flex min-h-dvh flex-col text-foreground'>
-      <header className='flex items-center justify-between border-b border-separator px-4 py-3 sm:px-6 sm:py-4'>
+      <header className='flex items-center justify-between border-b border-separator px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:py-4 sm:pt-[max(1rem,env(safe-area-inset-top))]'>
         <Button
           isIconOnly
           variant='ghost'
@@ -59,12 +70,14 @@ export function App() {
       <main className='flex flex-1 items-center justify-center p-4 sm:p-8'>
         {playing ? (
           <div className='flex w-full max-w-4xl justify-center'>
-            <Suspense>
+            {GameView ? (
               <GameView
                 theme={theme}
                 staves={staves}
               />
-            </Suspense>
+            ) : (
+              <Spinner />
+            )}
           </div>
         ) : (
           <Card className='w-full max-w-md'>

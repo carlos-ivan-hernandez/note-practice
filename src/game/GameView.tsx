@@ -1,8 +1,9 @@
-import {AUTO, Game, Scale} from 'phaser';
+import {CANVAS, Game, Scale} from 'phaser';
 import {useEffect, useMemo, useRef, useSyncExternalStore} from 'react';
 import {computeLayout} from './layout';
 import type {Staves} from './notes';
 import {PracticeScene, type Theme, paperColor} from './PracticeScene';
+import {loadMusicFont} from './preload';
 
 // Below this viewport width the game switches to its narrow, two-row layout.
 const compactQuery = '(max-width: 639px)';
@@ -27,11 +28,10 @@ export function GameView({theme, staves}: {theme: Theme; staves: Staves}) {
   useEffect(() => {
     let cancelled = false;
 
-    // Phaser renders text to canvas once, so the clef glyphs' font must be ready first.
-    void document.fonts.load('72px "Noto Music"', '\u{1D11E}\u{1D122}\u{1D114}').finally(() => {
+    void loadMusicFont().finally(() => {
       if (cancelled || !parent.current) return;
       game.current = new Game({
-        type: AUTO,
+        type: CANVAS,
         parent: parent.current,
         width: layout.width * zoom,
         height: layout.height * zoom,

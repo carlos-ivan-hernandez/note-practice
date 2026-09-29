@@ -8,7 +8,8 @@ The app always opens in dark mode (white notation on black); the header toggle s
 ## Stack
 
 - **App shell:** Vite, React, HeroUI v3, Tailwind CSS v4
-- **Game view:** [Phaser 4](https://phaser.io) — renders the grand staff, notes and answer buttons on a canvas
+- **Game view:** [Phaser 4](https://phaser.io) (canvas renderer) — renders the staff, notes and answer buttons
+- **PWA:** `vite-plugin-pwa`, icons from `@vite-pwa/assets-generator`
 - **Clef glyphs:** Noto Music via `@fontsource/noto-music`
 
 ## Development
@@ -17,6 +18,19 @@ The app always opens in dark mode (white notation on black); the header toggle s
 pnpm install
 pnpm dev
 ```
+
+The dev server ships unminified dependencies (Phaser alone is ~21MB), so it is slow on a phone. To try it on a phone,
+use a production build instead:
+
+```sh
+pnpm build
+pnpm preview --host
+```
+
+## PWA
+
+The app is installable and works offline: the service worker precaches everything, including the Phaser chunk and the
+music font. Icons are generated from `public/app-icon.svg` with `pnpm generate-pwa-assets`.
 
 ## Layout
 
