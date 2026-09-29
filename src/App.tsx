@@ -1,14 +1,28 @@
-import {Button, Card} from '@heroui/react';
+import {Button, Card, ToggleButton, ToggleButtonGroup} from '@heroui/react';
 import {Moon, Music, Play, Square, Sun} from 'lucide-react';
 import {Suspense, lazy, useEffect, useState} from 'react';
+import type {Staves} from './game/notes';
 import type {Theme} from './game/PracticeScene';
+import {load, save} from './session';
+
+const stavesOptions: {id: Staves; label: string}[] = [
+  {id: 'grand', label: 'Grand staff'},
+  {id: 'treble', label: 'Treble'},
+  {id: 'bass', label: 'Bass'},
+];
 
 const GameView = lazy(() => import('./game/GameView').then(m => ({default: m.GameView})));
 
 export function App() {
-  const [playing, setPlaying] = useState(false);
-  // Every visit starts in dark mode; the toggle only lasts for the session.
-  const [theme, setTheme] = useState<Theme>('dark');
+  const [playing, setPlaying] = useState(() => load('playing', false));
+  // New tabs start in dark mode; the toggle only lasts for the tab's session.
+  const [theme, setTheme] = useState<Theme>(() => load('theme', 'dark'));
+
+  const [staves, setStaves] = useState<Staves>(() => load('staves', 'grand'));
+
+  useEffect(() => save('playing', playing), [playing]);
+  useEffect(() => save('staves', staves), [staves]);
+  useEffect(() => save('theme', theme), [theme]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -19,7 +33,7 @@ export function App() {
 
   return (
     <div className='flex min-h-dvh flex-col text-foreground'>
-      <header className='flex items-center justify-between border-b border-separator px-6 py-4'>
+      <header className='flex items-center justify-between border-b border-separator px-4 py-3 sm:px-6 sm:py-4'>
         <div className='flex items-center gap-2'>
           <Music className='size-5 text-accent' />
           <h1 className='text-lg font-semibold'>Note Practice</h1>
@@ -28,7 +42,10 @@ export function App() {
           {playing && (
             <Button
               variant='outline'
-              onPress={() => setPlaying(false)}
+              onPress={() => {
+                save('note', null);
+                setPlaying(false);
+              }}
             >
               <Square className='size-4' />
               End
@@ -47,21 +64,45 @@ export function App() {
 
       <main className='flex flex-1 items-center justify-center p-4 sm:p-8'>
         {playing ? (
-          <div className='flex w-full max-w-4xl flex-col items-center gap-3'>
+          <div className='flex w-full max-w-4xl justify-center'>
             <Suspense>
-              <GameView theme={theme} />
+              <GameView
+                theme={theme}
+                staves={staves}
+              />
             </Suspense>
-            <p className='text-sm text-muted'>Click the letter that matches the note, or press A–G on your keyboard.</p>
           </div>
         ) : (
           <Card className='w-full max-w-md'>
             <Card.Header>
-              <Card.Title>Sight-read the grand staff</Card.Title>
+              <Card.Title>Sight-reading practice</Card.Title>
               <Card.Description>
-                A note will appear on the treble or bass clef. Pick its letter name to move on to the next one. No
+                A note will appear on the staff. Pick its letter name, or press A–G, to move on to the next one. No
                 points, no timer — just practice.
               </Card.Description>
             </Card.Header>
+            <Card.Content>
+              <ToggleButtonGroup
+                aria-label='Staff'
+                fullWidth
+                selectionMode='single'
+                disallowEmptySelection
+                selectedKeys={[staves]}
+                onSelectionChange={keys => {
+                  const next = stavesOptions.find(o => keys.has(o.id));
+                  if (next) setStaves(next.id);
+                }}
+              >
+                {stavesOptions.map(option => (
+                  <ToggleButton
+                    key={option.id}
+                    id={option.id}
+                  >
+                    {option.label}
+                  </ToggleButton>
+                ))}
+              </ToggleButtonGroup>
+            </Card.Content>
             <Card.Footer>
               <Button
                 variant='primary'

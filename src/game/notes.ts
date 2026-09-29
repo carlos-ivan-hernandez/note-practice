@@ -13,18 +13,28 @@ export const staffLines: Record<Clef, {bottom: number; top: number}> = {
   bass: {bottom: step('G', 2), top: step('A', 3)},
 };
 
-// Practice range: up to two ledger lines outside each staff, meeting at middle C.
-const ranges: Record<Clef, {low: number; high: number}> = {
-  treble: {low: step('C', 4), high: step('C', 6)},
-  bass: {low: step('C', 2), high: step('C', 4)},
+export type Staves = 'grand' | 'treble' | 'bass';
+
+// Practice ranges reach two ledger lines outside each staff, except that the grand staff's two staves meet at
+// middle C instead of overlapping.
+const ranges: Record<Staves, {clef: Clef; low: number; high: number}[]> = {
+  grand: [
+    {clef: 'treble', low: step('C', 4), high: step('C', 6)},
+    {clef: 'bass', low: step('C', 2), high: step('C', 4)},
+  ],
+  treble: [{clef: 'treble', low: step('A', 3), high: step('C', 6)}],
+  bass: [{clef: 'bass', low: step('C', 2), high: step('E', 4)}],
 };
 
 export const letterOf = (note: Note): Letter => letters[note.step % 7];
 
-export function randomNote(previous?: Note): Note {
+export const inRange = (note: Note, staves: Staves) =>
+  ranges[staves].some(r => r.clef === note.clef && note.step >= r.low && note.step <= r.high);
+
+export function randomNote(staves: Staves, previous?: Note): Note {
+  const options = ranges[staves];
   for (;;) {
-    const clef: Clef = Math.random() < 0.5 ? 'treble' : 'bass';
-    const {low, high} = ranges[clef];
+    const {clef, low, high} = options[Math.floor(Math.random() * options.length)];
     const note = {clef, step: low + Math.floor(Math.random() * (high - low + 1))};
     if (!previous || letterOf(previous) !== letterOf(note)) return note;
   }

@@ -1,6 +1,6 @@
 # note-practice
 
-A simple sight-reading trainer for the grand staff. Press **Start**, and a note appears on the treble or bass clef. Click
+A simple sight-reading trainer. Pick the grand staff, treble clef or bass clef, press **Start**, and a note appears. Click
 its letter name (A–G), or press the key on your keyboard, to move on to the next note. No points, no timer.
 
 The app always opens in dark mode (white notation on black); the header toggle switches to light mode for the session.
@@ -23,6 +23,7 @@ pnpm dev
 - `src/App.tsx` — app shell (start screen, header)
 - `src/game/GameView.tsx` — mounts and tears down the Phaser game
 - `src/game/PracticeScene.ts` — draws the staff, handles answers and feedback
-- `src/game/notes.ts` — note model, practice range, ledger-line logic
+- `src/game/layout.ts` — canvas geometry; a compact two-row layout is used below 640px wide
+- `src/game/notes.ts` — note model, practice ranges, ledger-line logic
 
-Notes range from C2 to C6 (up to two ledger lines outside each staff). Sharps and flats are not included yet.
+Notes reach up to two ledger lines outside each staff: C4–C6 and C2–C4 on the grand staff, A3–C6 treble only, C2–E4 bass only. Sharps and flats are not included yet.

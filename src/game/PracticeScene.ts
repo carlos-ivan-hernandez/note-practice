@@ -1,8 +1,18 @@
-import {type GameObjects, Scene} from 'phaser';
-import {type Clef, type Letter, type Note, ledgerSteps, letterOf, letters, randomNote, staffLines} from './notes';
-
-export const WIDTH = 900;
-export const HEIGHT = 540;
+import {type GameObjects, type Input, Scene} from 'phaser';
+import {load, save} from '../session';
+import {type ButtonRect, type Layout, SPACE} from './layout';
+import {
+  type Clef,
+  type Letter,
+  type Note,
+  type Staves,
+  inRange,
+  ledgerSteps,
+  letterOf,
+  letters,
+  randomNote,
+  staffLines,
+} from './notes';
 
 export type Theme = 'light' | 'dark';
 
@@ -32,26 +42,11 @@ type Palette = (typeof palettes)[Theme];
 export const paperColor = (theme: Theme) => css(palettes[theme].paper);
 const css = (color: number) => `#${color.toString(16).padStart(6, '0')}`;
 
-const SPACE = 18; // distance between staff lines
 const HALF = SPACE / 2; // one diatonic step
-const STAFF_LEFT = 110;
-const STAFF_RIGHT = 820;
-const TREBLE_TOP = 120;
-const BASS_TOP = TREBLE_TOP + 8 * SPACE;
-const NOTE_X = 520;
 const CLEF_FONT = '"Noto Music", serif';
+const glyphs: Record<Clef, string> = {treble: '\u{1D11E}', bass: '\u{1D122}'};
 
-// Answer buttons appear in musical-alphabet order starting from A.
-const answerOrder: Letter[] = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
-const BUTTON_W = 88;
-const BUTTON_H = 64;
-const BUTTON_GAP = 14;
-const BUTTON_Y = 440;
-
-type AnswerButton = {letter: Letter; bg: GameObjects.Graphics; x: number; hovered: boolean};
-
-const staffTop = (clef: Clef) => (clef === 'treble' ? TREBLE_TOP : BASS_TOP);
-const yOf = (clef: Clef, step: number) => staffTop(clef) + (staffLines[clef].top - step) * HALF;
+type AnswerButton = ButtonRect & {bg: GameObjects.Graphics; hovered: boolean};
 
 export class PracticeScene extends Scene {
   private note?: Note;
@@ -60,6 +55,9 @@ export class PracticeScene extends Scene {
   private locked = false;
   private theme: Theme = 'dark';
   private colors: Palette = palettes.dark;
+  private staves: Staves = 'grand';
+  private layout!: Layout;
+  private zoom = 1;
 
   constructor() {
     super('practice');
@@ -69,13 +67,20 @@ export class PracticeScene extends Scene {
   create(data: {note?: Note}) {
     this.theme = this.registry.get('theme') === 'light' ? 'light' : 'dark';
     this.colors = palettes[this.theme];
-    this.cameras.main.setBackgroundColor(this.colors.paper);
+    this.staves = this.registry.get('staves');
+    this.layout = this.registry.get('layout');
+    // The canvas is `zoom` times the layout size so it stays sharp on high-density screens.
+    this.zoom = this.registry.get('zoom');
+    this.cameras.main
+      .setBackgroundColor(this.colors.paper)
+      .setZoom(this.zoom)
+      .centerOn(this.layout.width / 2, this.layout.height / 2);
 
     const onTheme = () => this.scene.restart({note: this.note});
     this.registry.events.on('changedata-theme', onTheme);
     this.events.once('shutdown', () => this.registry.events.off('changedata-theme', onTheme));
 
-    this.drawGrandStaff();
+    this.drawStaves();
     this.noteLayer = this.add.container(0, 0);
     // Staff lines are drawn again above the note so they show through the whole-note hole.
     this.drawStaffLines(this.add.graphics());
@@ -86,8 +91,9 @@ export class PracticeScene extends Scene {
       if (letter) this.answer(letter);
     });
 
-    if (data.note) {
-      this.note = data.note;
+    const note = data.note ?? load<Note | null>('note', null);
+    if (note && inRange(note, this.staves)) {
+      this.note = note;
       this.drawNote(this.colors.ink);
       this.locked = false;
     } else {
@@ -95,56 +101,64 @@ export class PracticeScene extends Scene {
     }
   }
 
-  private drawGrandStaff() {
+  private yOf(clef: Clef, step: number) {
+    const top = this.layout.staffs.find(s => s.clef === clef)?.top ?? 0;
+    return top + (staffLines[clef].top - step) * HALF;
+  }
+
+  private drawStaves() {
+    const {staffLeft, staffRight, staffs} = this.layout;
     const g = this.add.graphics();
     this.drawStaffLines(g);
 
-    // System barline and brace joining both staves.
-    const top = TREBLE_TOP;
-    const bottom = BASS_TOP + 4 * SPACE;
-    g.lineStyle(2, this.colors.ink).lineBetween(STAFF_LEFT, top, STAFF_LEFT, bottom);
-    g.lineStyle(1.5, this.colors.ink).lineBetween(STAFF_RIGHT, top, STAFF_RIGHT, bottom);
-    this.drawBrace(STAFF_LEFT - 6, top, bottom);
+    const top = staffs[0].top;
+    const bottom = staffs[staffs.length - 1].top + 4 * SPACE;
+    g.lineStyle(1.5, this.colors.ink).lineBetween(staffRight, top, staffRight, bottom);
+    if (this.staves === 'grand') {
+      // System barline and brace joining both staves.
+      g.lineStyle(2, this.colors.ink).lineBetween(staffLeft, top, staffLeft, bottom);
+      this.drawBrace(staffLeft - 6, top, bottom);
+    }
 
-    this.drawClef('treble', '\u{1D11E}', STAFF_LEFT + 12);
-    this.drawClef('bass', '\u{1D122}', STAFF_LEFT + 12);
+    for (const {clef} of staffs) this.drawClef(clef, staffLeft + 12);
   }
 
   // Noto Music follows SMuFL conventions: the glyph baseline sits on the bottom staff line and one staff space is
   // 0.225em. Drawing to our own canvas keeps that baseline exact, which Phaser's Text box metrics do not.
-  private drawClef(clef: Clef, glyph: string, x: number) {
-    const size = SPACE / 0.225;
+  private drawClef(clef: Clef, x: number) {
+    const size = (SPACE / 0.225) * this.zoom;
     const above = size * 1.4;
-    const key = `clef-${clef}-${this.theme}`;
+    const key = `clef-${clef}-${this.theme}-${this.zoom}`;
     if (!this.textures.exists(key)) {
       const texture = this.textures.createCanvas(key, size, size * 1.8);
       const ctx = texture?.getContext();
       if (!texture || !ctx) return;
       ctx.font = `${size}px ${CLEF_FONT}`;
       ctx.fillStyle = css(this.colors.ink);
-      ctx.fillText(glyph, 0, above);
+      ctx.fillText(glyphs[clef], 0, above);
       texture.refresh();
     }
-    this.add.image(x, yOf(clef, staffLines[clef].bottom), key).setOrigin(0, above / (size * 1.8));
+    this.add
+      .image(x, this.yOf(clef, staffLines[clef].bottom), key)
+      .setOrigin(0, above / (size * 1.8))
+      .setScale(1 / this.zoom);
   }
 
   private drawStaffLines(g: GameObjects.Graphics) {
+    const {staffLeft, staffRight, staffs} = this.layout;
     g.lineStyle(1.5, this.colors.ink);
-    for (const clef of ['treble', 'bass'] as const) {
-      for (let i = 0; i < 5; i++) {
-        const y = staffTop(clef) + i * SPACE;
-        g.lineBetween(STAFF_LEFT, y, STAFF_RIGHT, y);
-      }
+    for (const {top} of staffs) {
+      for (let i = 0; i < 5; i++) g.lineBetween(staffLeft, top + i * SPACE, staffRight, top + i * SPACE);
     }
   }
 
   // The font's brace glyph is cropped to its ink and stretched to span both staves.
   private drawBrace(x: number, top: number, bottom: number) {
-    const key = `brace-${this.theme}`;
+    const key = `brace-${this.theme}-${this.zoom}`;
     if (!this.textures.exists(key)) {
       const probe = document.createElement('canvas').getContext('2d');
       if (!probe) return;
-      probe.font = `100px ${CLEF_FONT}`;
+      probe.font = `${100 * this.zoom}px ${CLEF_FONT}`;
       const m = probe.measureText('\u{1D114}');
       const w = Math.ceil(m.actualBoundingBoxLeft + m.actualBoundingBoxRight);
       const h = Math.ceil(m.actualBoundingBoxAscent + m.actualBoundingBoxDescent);
@@ -163,28 +177,28 @@ export class PracticeScene extends Scene {
   }
 
   private drawButtons() {
-    const total = answerOrder.length * BUTTON_W + (answerOrder.length - 1) * BUTTON_GAP;
-    const startX = (WIDTH - total) / 2;
-
-    this.buttons = answerOrder.map((letter, i) => {
-      const x = startX + i * (BUTTON_W + BUTTON_GAP);
-      const button: AnswerButton = {letter, x, bg: this.add.graphics(), hovered: false};
+    this.buttons = this.layout.buttons.map(rect => {
+      const button: AnswerButton = {...rect, bg: this.add.graphics(), hovered: false};
+      const {letter, x, y, w, h} = button;
       this.paintButton(button);
 
       this.add
-        .text(x + BUTTON_W / 2, BUTTON_Y + BUTTON_H / 2, letter, {
+        .text(x + w / 2, y + h / 2, letter, {
           fontFamily: 'Geist, ui-sans-serif, system-ui, sans-serif',
           fontSize: '28px',
           fontStyle: '600',
           color: css(this.colors.ink),
         })
-        .setOrigin(0.5);
+        .setOrigin(0.5)
+        .setResolution(this.zoom);
 
       this.add
-        .zone(x, BUTTON_Y, BUTTON_W, BUTTON_H)
+        .zone(x, y, w, h)
         .setOrigin(0)
         .setInteractive({useHandCursor: true})
-        .on('pointerover', () => {
+        .on('pointerover', (pointer: Input.Pointer) => {
+          // Touch has no hover; a tap would otherwise leave the button stuck in its hover color.
+          if (pointer.wasTouch) return;
           button.hovered = true;
           this.paintButton(button);
         })
@@ -199,13 +213,14 @@ export class PracticeScene extends Scene {
   }
 
   private paintButton(button: AnswerButton, flash?: number) {
+    const {x, y, w, h} = button;
     const fill = flash ?? (button.hovered ? this.colors.buttonHover : this.colors.button);
     button.bg
       .clear()
       .fillStyle(fill)
-      .fillRoundedRect(button.x, BUTTON_Y, BUTTON_W, BUTTON_H, 10)
+      .fillRoundedRect(x, y, w, h, 10)
       .lineStyle(1.5, flash ?? this.colors.buttonBorder)
-      .strokeRoundedRect(button.x, BUTTON_Y, BUTTON_W, BUTTON_H, 10);
+      .strokeRoundedRect(x, y, w, h, 10);
   }
 
   private flashButton(letter: Letter, color: number) {
@@ -221,22 +236,24 @@ export class PracticeScene extends Scene {
     this.noteLayer.removeAll(true);
 
     // Whole note: a wide oval with a tilted oval hole cut out of it.
-    const y = yOf(note.clef, note.step);
-    const head = this.add.graphics({x: NOTE_X, y});
+    const {noteX} = this.layout;
+    const y = this.yOf(note.clef, note.step);
+    const head = this.add.graphics({x: noteX, y});
     head.fillStyle(color).fillEllipse(0, 0, 26, SPACE);
-    const hole = this.add.graphics({x: NOTE_X, y}).setRotation(-0.9);
+    const hole = this.add.graphics({x: noteX, y}).setRotation(-0.9);
     hole.fillStyle(this.colors.paper).fillEllipse(0, 0, 13, 9);
 
     const ledgers = this.add.graphics().lineStyle(1.5, this.colors.ink);
     for (const ledger of ledgerSteps(note)) {
-      const ly = yOf(note.clef, ledger);
-      ledgers.lineBetween(NOTE_X - 22, ly, NOTE_X + 22, ly);
+      const ly = this.yOf(note.clef, ledger);
+      ledgers.lineBetween(noteX - 22, ly, noteX + 22, ly);
     }
     this.noteLayer.add([head, hole, ledgers]);
   }
 
   private nextNote() {
-    this.note = randomNote(this.note);
+    this.note = randomNote(this.staves, this.note);
+    save('note', this.note);
     this.drawNote(this.colors.ink);
     this.noteLayer.setAlpha(0).setX(12);
     this.tweens.add({targets: this.noteLayer, alpha: 1, x: 0, duration: 180, ease: 'Cubic.easeOut'});
